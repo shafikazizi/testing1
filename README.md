@@ -1,12 +1,10 @@
-<!doctype html>
+
 <html lang="ms" class="h-full">
  <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sistem Buku Perkhidmatan Kerajaan</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="/_sdk/data_sdk.js"></script>
-  <script src="/_sdk/element_sdk.js"></script>
   <style>
         body {
             box-sizing: border-box;
@@ -39,6 +37,8 @@
         }
     </style>
   <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="/_sdk/element_sdk.js" type="text/javascript"></script>
  </head>
  <body class="h-full bg-gray-50">
   <div class="min-h-full"><!-- Header -->
@@ -47,8 +47,8 @@
      <div class="flex justify-between items-center py-6">
       <div class="flex items-center">
        <div>
-        <h1 id="system-title" class="text-2xl font-bold text-white">Sistem Buku Perkhidmatan Kerajaan</h1>
-        <p id="department-name" class="text-blue-200">Pejabat Pendidikan Daerah Limbang</p>
+        <h1 class="text-2xl font-bold text-white">Sistem Buku Perkhidmatan Kerajaan</h1>
+        <p class="text-blue-200">Pejabat Pendidikan Daerah Limbang</p>
        </div>
       </div>
       <div class="flex items-center space-x-4"><span id="record-count" class="text-blue-200 text-sm">0 rekod</span> <button id="add-btn" class="bg-yellow-500 hover:bg-yellow-600 text-blue-900 font-semibold px-4 py-2 rounded-lg transition-colors duration-200"> + Tambah Rekod </button>
@@ -91,11 +91,18 @@
       <h3 class="mt-2 text-sm font-medium text-gray-900">Tiada rekod</h3>
       <p class="mt-1 text-sm text-gray-500">Mulakan dengan menambah rekod perkhidmatan pertama.</p>
      </div>
+    </div><!-- Export/Import Section -->
+    <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+     <h3 class="text-lg font-medium text-gray-900 mb-4">Import/Export Data</h3>
+     <div class="flex flex-wrap gap-4"><button id="export-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"> 📥 Export ke JSON </button>
+      <div class="flex items-center"><input type="file" id="import-file" accept=".json" class="hidden"> <button id="import-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"> 📤 Import dari JSON </button>
+      </div><button id="clear-data-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200"> 🗑️ Kosongkan Semua Data </button>
+     </div>
     </div>
    </main><!-- Footer -->
    <footer class="bg-gray-800 text-white py-6 mt-12">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-     <p id="footer-text">© 2024 Kerajaan Malaysia</p>
+     <p>© 2024 Kerajaan Malaysia</p>
     </div>
    </footer>
   </div><!-- Add/Edit Modal -->
@@ -151,6 +158,18 @@
      </div>
     </div>
    </div>
+  </div><!-- Clear Data Confirmation Modal -->
+  <div id="clear-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden z-50">
+   <div class="flex items-center justify-center min-h-screen px-4">
+    <div class="bg-white rounded-lg shadow-xl max-w-md w-full">
+     <div class="px-6 py-4">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Kosongkan Semua Data</h3>
+      <p class="text-sm text-gray-600 mb-6">Adakah anda pasti ingin memadam SEMUA rekod? Tindakan ini tidak boleh dibatalkan.</p>
+      <div class="flex justify-end space-x-3"><button id="clear-cancel-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"> Batal </button> <button id="clear-confirm-btn" class="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"> Kosongkan Semua </button>
+      </div>
+     </div>
+    </div>
+   </div>
   </div>
   <script>
         let allRecords = [];
@@ -159,86 +178,27 @@
         let recordToDelete = null;
         let currentRecordCount = 0;
 
-        const defaultConfig = {
-            system_title: "Sistem Buku Perkhidmatan Kerajaan",
-            department_name: "Pejabat Pendidikan Daerah Limbang",
-            footer_text: "© 2024 Kerajaan Malaysia",
-            primary_color: "#1e3a8a",
-            secondary_color: "#eab308",
-            background_color: "#f9fafb"
-        };
-
-        // Data handler for SDK
-        const dataHandler = {
-            onDataChanged(data) {
-                allRecords = data;
-                currentRecordCount = data.length;
-                updateRecordCount();
-                applyFilters();
-                updateMinistryFilter();
-            }
-        };
-
-        // Element SDK functions
-        async function render(config) {
-            document.getElementById('system-title').textContent = config.system_title || defaultConfig.system_title;
-            document.getElementById('department-name').textContent = config.department_name || defaultConfig.department_name;
-            document.getElementById('footer-text').textContent = config.footer_text || defaultConfig.footer_text;
+        // Local Storage functions
+        function saveToLocalStorage() {
+            localStorage.setItem('service_records', JSON.stringify(allRecords));
         }
 
-        function mapToCapabilities(config) {
-            return {
-                recolorables: [
-                    {
-                        get: () => config.primary_color || defaultConfig.primary_color,
-                        set: (value) => {
-                            config.primary_color = value;
-                            window.elementSdk.setConfig({ primary_color: value });
-                        }
-                    },
-                    {
-                        get: () => config.secondary_color || defaultConfig.secondary_color,
-                        set: (value) => {
-                            config.secondary_color = value;
-                            window.elementSdk.setConfig({ secondary_color: value });
-                        }
-                    }
-                ],
-                borderables: [],
-                fontEditable: undefined,
-                fontSizeable: undefined
-            };
+        function loadFromLocalStorage() {
+            const data = localStorage.getItem('service_records');
+            return data ? JSON.parse(data) : [];
         }
 
-        function mapToEditPanelValues(config) {
-            return new Map([
-                ["system_title", config.system_title || defaultConfig.system_title],
-                ["department_name", config.department_name || defaultConfig.department_name],
-                ["footer_text", config.footer_text || defaultConfig.footer_text]
-            ]);
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
         }
 
-        // Initialize SDKs
-        async function initializeApp() {
-            try {
-                if (window.elementSdk) {
-                    await window.elementSdk.init({
-                        defaultConfig,
-                        render,
-                        mapToCapabilities,
-                        mapToEditPanelValues
-                    });
-                }
-
-                if (window.dataSdk) {
-                    const result = await window.dataSdk.init(dataHandler);
-                    if (!result.isOk) {
-                        showToast('Ralat memulakan sistem data', 'error');
-                    }
-                }
-            } catch (error) {
-                showToast('Ralat memulakan aplikasi', 'error');
-            }
+        // Initialize app
+        function initializeApp() {
+            allRecords = loadFromLocalStorage();
+            currentRecordCount = allRecords.length;
+            updateRecordCount();
+            applyFilters();
+            updateMinistryFilter();
         }
 
         // Utility functions
@@ -330,8 +290,8 @@
                         ${record.pengemaskinian_sehingga ? formatDate(record.pengemaskinian_sehingga) : '-'}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button onclick="editRecord('${record.__backendId}')" class="text-blue-600 hover:text-blue-900 mr-3">Edit</button>
-                        <button onclick="showDeleteModal('${record.__backendId}')" class="text-red-600 hover:text-red-900">Padam</button>
+                        <button onclick="editRecord('${record.id}')" class="text-blue-600 hover:text-blue-900 mr-3">Edit</button>
+                        <button onclick="showDeleteModal('${record.id}')" class="text-red-600 hover:text-red-900">Padam</button>
                     </td>
                 </tr>
             `).join('');
@@ -361,7 +321,7 @@
         }
 
         function showDeleteModal(recordId) {
-            recordToDelete = allRecords.find(r => r.__backendId === recordId);
+            recordToDelete = allRecords.find(r => r.id === recordId);
             document.getElementById('delete-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
         }
@@ -372,13 +332,23 @@
             recordToDelete = null;
         }
 
+        function showClearModal() {
+            document.getElementById('clear-modal').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function hideClearModal() {
+            document.getElementById('clear-modal').classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+
         function editRecord(recordId) {
-            editingRecord = allRecords.find(r => r.__backendId === recordId);
+            editingRecord = allRecords.find(r => r.id === recordId);
             if (!editingRecord) return;
 
             // Populate form
             Object.keys(editingRecord).forEach(key => {
-                if (key !== '__backendId') {
+                if (key !== 'id' && key !== 'tarikh_masuk') {
                     const element = document.getElementById(key);
                     if (element) {
                         element.value = editingRecord[key] || '';
@@ -389,7 +359,7 @@
             showModal('Edit Rekod');
         }
 
-        async function saveRecord(formData) {
+        function saveRecord(formData) {
             const saveBtn = document.getElementById('save-btn');
             const saveText = document.getElementById('save-text');
             const saveSpinner = document.getElementById('save-spinner');
@@ -398,40 +368,42 @@
             saveText.textContent = 'Menyimpan...';
             saveSpinner.classList.remove('hidden');
 
-            try {
-                if (currentRecordCount >= 999 && !editingRecord) {
-                    showToast('Had maksimum 999 rekod telah dicapai. Sila padam beberapa rekod terlebih dahulu.', 'error');
-                    return;
-                }
+            setTimeout(() => {
+                try {
+                    const recordData = {
+                        ...formData,
+                        tarikh_masuk: new Date().toISOString()
+                    };
 
-                const recordData = {
-                    ...formData,
-                    tarikh_masuk: new Date().toISOString()
-                };
+                    if (editingRecord) {
+                        // Update existing record
+                        const index = allRecords.findIndex(r => r.id === editingRecord.id);
+                        allRecords[index] = { ...editingRecord, ...recordData };
+                        showToast('Rekod berjaya dikemaskini');
+                    } else {
+                        // Add new record
+                        recordData.id = generateId();
+                        allRecords.push(recordData);
+                        currentRecordCount++;
+                        showToast('Rekod berjaya disimpan');
+                    }
 
-                let result;
-                if (editingRecord) {
-                    result = await window.dataSdk.update({ ...editingRecord, ...recordData });
-                } else {
-                    result = await window.dataSdk.create(recordData);
-                }
-
-                if (result.isOk) {
-                    showToast(editingRecord ? 'Rekod berjaya dikemaskini' : 'Rekod berjaya disimpan');
+                    saveToLocalStorage();
+                    updateRecordCount();
+                    applyFilters();
+                    updateMinistryFilter();
                     hideModal();
-                } else {
+                } catch (error) {
                     showToast('Ralat menyimpan rekod', 'error');
+                } finally {
+                    saveBtn.disabled = false;
+                    saveText.textContent = 'Simpan';
+                    saveSpinner.classList.add('hidden');
                 }
-            } catch (error) {
-                showToast('Ralat menyimpan rekod', 'error');
-            } finally {
-                saveBtn.disabled = false;
-                saveText.textContent = 'Simpan';
-                saveSpinner.classList.add('hidden');
-            }
+            }, 500);
         }
 
-        async function deleteRecord() {
+        function deleteRecord() {
             if (!recordToDelete) return;
 
             const deleteBtn = document.getElementById('delete-confirm-btn');
@@ -442,22 +414,96 @@
             deleteText.textContent = 'Memadam...';
             deleteSpinner.classList.remove('hidden');
 
-            try {
-                const result = await window.dataSdk.delete(recordToDelete);
-                
-                if (result.isOk) {
+            setTimeout(() => {
+                try {
+                    allRecords = allRecords.filter(r => r.id !== recordToDelete.id);
+                    currentRecordCount = allRecords.length;
+                    
+                    saveToLocalStorage();
+                    updateRecordCount();
+                    applyFilters();
+                    updateMinistryFilter();
                     showToast('Rekod berjaya dipadam');
                     hideDeleteModal();
-                } else {
+                } catch (error) {
                     showToast('Ralat memadam rekod', 'error');
+                } finally {
+                    deleteBtn.disabled = false;
+                    deleteText.textContent = 'Padam';
+                    deleteSpinner.classList.add('hidden');
                 }
-            } catch (error) {
-                showToast('Ralat memadam rekod', 'error');
-            } finally {
-                deleteBtn.disabled = false;
-                deleteText.textContent = 'Padam';
-                deleteSpinner.classList.add('hidden');
+            }, 500);
+        }
+
+        function clearAllData() {
+            allRecords = [];
+            currentRecordCount = 0;
+            saveToLocalStorage();
+            updateRecordCount();
+            applyFilters();
+            updateMinistryFilter();
+            showToast('Semua data telah dikosongkan');
+            hideClearModal();
+        }
+
+        function exportData() {
+            if (allRecords.length === 0) {
+                showToast('Tiada data untuk diexport', 'error');
+                return;
             }
+
+            const dataStr = JSON.stringify(allRecords, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `service_records_${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            
+            showToast('Data berjaya diexport');
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    if (!Array.isArray(importedData)) {
+                        throw new Error('Format data tidak sah');
+                    }
+
+                    // Validate data structure
+                    const validData = importedData.filter(record => 
+                        record.nama_penuh && record.no_kad_pengenalan && record.no_perkhidmatan
+                    );
+
+                    // Add IDs to imported records if they don't have them
+                    validData.forEach(record => {
+                        if (!record.id) {
+                            record.id = generateId();
+                        }
+                    });
+
+                    allRecords = validData;
+                    currentRecordCount = allRecords.length;
+                    
+                    saveToLocalStorage();
+                    updateRecordCount();
+                    applyFilters();
+                    updateMinistryFilter();
+                    
+                    showToast(`${validData.length} rekod berjaya diimport`);
+                } catch (error) {
+                    showToast('Ralat import data: Format file tidak sah', 'error');
+                }
+            };
+            
+            reader.readAsText(file);
+            event.target.value = ''; // Reset file input
         }
 
         // Event listeners
@@ -467,6 +513,15 @@
         document.getElementById('cancel-btn').addEventListener('click', hideModal);
         document.getElementById('delete-cancel-btn').addEventListener('click', hideDeleteModal);
         document.getElementById('delete-confirm-btn').addEventListener('click', deleteRecord);
+        document.getElementById('clear-cancel-btn').addEventListener('click', hideClearModal);
+        document.getElementById('clear-confirm-btn').addEventListener('click', clearAllData);
+        document.getElementById('clear-data-btn').addEventListener('click', showClearModal);
+
+        document.getElementById('export-btn').addEventListener('click', exportData);
+        document.getElementById('import-btn').addEventListener('click', () => {
+            document.getElementById('import-file').click();
+        });
+        document.getElementById('import-file').addEventListener('change', importData);
 
         document.getElementById('search-input').addEventListener('input', applyFilters);
         document.getElementById('status-filter').addEventListener('change', applyFilters);
@@ -487,6 +542,10 @@
         document.getElementById('delete-modal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) hideDeleteModal();
         });
+
+        document.getElementById('clear-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) hideClearModal();
+        });
     </script>
- <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99e4fe19148264ad',t:'MTc2MzEwNzQwOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'99e506c820d964ad',t:'MTc2MzEwNzc2NC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
